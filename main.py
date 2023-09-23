@@ -1,13 +1,29 @@
-# import os
-from flask import Flask, request
+import os
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import logging
 import pdfkit
+from dotenv import load_dotenv
+import cloudinary.uploader
+
+# import tensorflow as tf
+
+# from fastapi import FastAPI
+# from pydantic import BaseModel
+import transformers
+
+from transformers import AutoTokenizer, TFAutoModelForSeq2SeqLM
+
+import numpy as np
+
+
+load_dotenv()
 
 # import docx
 # from docx2pdf import convert
 
+# print(os.getenv("CLOUD_NAME"))
 
 # import flask_cors
 from PyPDF2 import PdfReader
@@ -45,6 +61,25 @@ def translate(text):
 # def generate_pdf():
 #     pdfkit.from_string(translate("hello"), "./out/out.pdf")
 #     return "PDF generated"
+
+
+# for uploading to cloudinary
+# @app.route("/test", methods=["GET"])
+def upload_to_cloudinary(file_path):
+    cloudinary.config(
+        cloud_name="deiuvjdci",
+        api_key="176911155882982",
+        api_secret="Zx9PINZVO99Nzp-fh11zdAOz26w",
+    )
+
+    # file_path = "./out/out.pdf"
+
+    upload_result = cloudinary.uploader.upload(
+        file_path,
+        resource_type="auto",
+    )
+    # app.logger.info(upload_result)
+    return jsonify(upload_result)
 
 
 @app.route("/")
@@ -85,7 +120,10 @@ def generate_pdf():
     }
 
     pdfkit.from_string(html_content, "./out/out.pdf", options=options)
-    return "PDF generated"
+
+    upload_result = upload_to_cloudinary("./out/out.pdf")
+
+    return upload_result
 
 
 # def generate_pdf():
@@ -119,6 +157,45 @@ def fileUpload():
     # session["uploadFilePath"] = destination
     response = "File successfully uploaded"
     return response
+
+
+with app.app_context():
+    # MODEL = tf.keras.models.load_model('model')
+    tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-hi")
+    model = TFAutoModelForSeq2SeqLM.from_pretrained("tf_model/")
+
+
+def generate_translation(input_text):
+    with current_app.app_context():
+        tokenized = tokenizer(input_text, return_tensors="np")
+        out = model.generate(**tokenized, max_length=128)
+        # print(out)
+
+        with tokenizer.as_target_tokenizer():
+            output = tokenizer.decode(out[0], skip_special_tokens=True)
+            print(tokenizer.decode(out[0], skip_special_tokens=True))
+            return {"Translation": output}
+
+
+# for model
+@app.route("/predict", methods=["POST"])
+def generate():
+    # print(request.data)
+    # print(request.get_json())  # this has json data now
+    input_text = request.get_json()
+    # print(input_text.get("input"))
+
+    translation = generate_translation(input_text.get("input"))
+
+    # tokenized = tokenizer(input_text, return_tensors="np")
+    # out = model.generate(**tokenized, max_length=128)
+    # # print(out)
+
+    # with tokenizer.as_target_tokenizer():
+    #     output = tokenizer.decode(out[0], skip_special_tokens=True)
+    #     print(tokenizer.decode(out[0], skip_special_tokens=True))
+    #     return {"Translation": output}
+    return jsonify(translation)
 
 
 if __name__ == "__main__":
