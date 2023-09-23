@@ -4,28 +4,8 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import logging
 import pdfkit
-from dotenv import load_dotenv
 import cloudinary.uploader
-
-# import tensorflow as tf
-
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-import transformers
-
 from transformers import AutoTokenizer, TFAutoModelForSeq2SeqLM
-
-import numpy as np
-
-
-load_dotenv()
-
-# import docx
-# from docx2pdf import convert
-
-# print(os.getenv("CLOUD_NAME"))
-
-# import flask_cors
 from PyPDF2 import PdfReader
 
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +19,11 @@ CORS(app)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 
+with app.app_context():
+    tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-hi")
+    model = TFAutoModelForSeq2SeqLM.from_pretrained("tf_model/")
+
+
 def read_file(file_path):
     reader = PdfReader(file_path)
     number_of_pages = len(reader.pages)
@@ -47,24 +32,31 @@ def read_file(file_path):
     text = page.extract_text()
     # print("Extracted Text is: ", end="\n")
     # print(text)
+    return text
 
 
-def translate(text):
-    # Here we will pass to ML model
+def generate_translation(input_text):
+    with current_app.app_context():
+        tokenized = tokenizer(input_text, return_tensors="np")
+        out = model.generate(**tokenized, max_length=128)
+        # print(out)
 
-    # For now we will return some dummy hindi paragraph
-    translated_text = "हिंदी हमारी राष्ट्रीय भाषा है। हमारे हिंदी भाषा कौशल को सीखना और सुधारना भारत के अधिकांश स्थानों में सेवा करने के लिए बहुत महत्वपूर्ण है। स्कूली दिनों से ही हम हिंदी भाषा सीखते थे। कुछ स्कूल और कॉलेज हिंदी के अतिरिक्त बोर्ड और निबंध बोर्ड में निबंध लेखन का आयोजन करते हैं, छात्रों को बोर्ड परीक्षा में हिंदी निबंध लिखने की आवश्यकता होती है।"
-
-    return translated_text
-
-
-# def generate_pdf():
-#     pdfkit.from_string(translate("hello"), "./out/out.pdf")
-#     return "PDF generated"
+        with tokenizer.as_target_tokenizer():
+            output = tokenizer.decode(out[0], skip_special_tokens=True)
+            # print(tokenizer.decode(out[0], skip_special_tokens=True))
+            return {"Translation": output}
 
 
-# for uploading to cloudinary
-# @app.route("/test", methods=["GET"])
+# def translate(text):
+#     # Here we will pass to ML model
+
+#     translated_text = generate_translation(text)
+#     # For now we will return some dummy hindi paragraph
+#     # translated_text = "हिंदी हमारी राष्ट्रीय भाषा है। हमारे हिंदी भाषा कौशल को सीखना और सुधारना भारत के अधिकांश स्थानों में सेवा करने के लिए बहुत महत्वपूर्ण है। स्कूली दिनों से ही हम हिंदी भाषा सीखते थे। कुछ स्कूल और कॉलेज हिंदी के अतिरिक्त बोर्ड और निबंध बोर्ड में निबंध लेखन का आयोजन करते हैं, छात्रों को बोर्ड परीक्षा में हिंदी निबंध लिखने की आवश्यकता होती है।"
+
+#     return translated_text["Translation"]
+
+
 def upload_to_cloudinary(file_path):
     cloudinary.config(
         cloud_name="deiuvjdci",
@@ -82,9 +74,40 @@ def upload_to_cloudinary(file_path):
     return jsonify(upload_result)
 
 
-@app.route("/")
+# @app.route("/upload", methods=["POST"])
+def fileTranslate(file):
+    # print(request.files["file"])
+    # if not os.path.isdir(UPLOAD_FOLDER):
+    #     os.mkdir(UPLOAD_FOLDER)
+    logger.info("welcome to upload")
+    # file = request.files["file"]
+    # print("File is: ", file)
+    filename = secure_filename(file.filename)  # type: ignore
+    print("File name is: ", filename)
+    destination = "/".join([UPLOAD_FOLDER, filename])
+    print("File destination is: ", destination)
+    file.save(destination)
+
+    # Extract text from the pdf
+    text = read_file(destination)
+    # print("Text is: ", text)
+
+    # now translate the text and generate pdf
+    translated_text = generate_translation(text)
+    # generate_pdf(translated_text)
+
+    # session["uploadFilePath"] = destination
+    # response = "File successfully uploaded"
+    return translated_text["Translation"]
+
+
+# Main route for pdf translation
+@app.route("/predict-pdf", methods=["POST"])
 def generate_pdf():
-    translated_text = translate("hello")
+    print(request.files["file"])
+    translated_text = fileTranslate(request.files["file"])
+
+    # translated_text = translate("hello")
 
     html_content = (
         """
@@ -126,58 +149,7 @@ def generate_pdf():
     return upload_result
 
 
-# def generate_pdf():
-#     document = docx.Document()
-#     document.add_paragraph(translate("dummy"))
-#     document.save("test.docx")
-# * In this approach docx file is generated but it is not converted to pdf. Because docx2pdf only works in Microsoft Windows
-#     convert("test.docx")
-
-
-@app.route("/upload", methods=["POST"])
-def fileUpload():
-    # print(request.files["file"])
-    # if not os.path.isdir(UPLOAD_FOLDER):
-    #     os.mkdir(UPLOAD_FOLDER)
-    logger.info("welcome to upload")
-    file = request.files["file"]
-    # print("File is: ", file)
-    filename = secure_filename(file.filename)  # type: ignore
-    print("File name is: ", filename)
-    destination = "/".join([UPLOAD_FOLDER, filename])
-    print("File destination is: ", destination)
-    file.save(destination)
-
-    text = read_file(destination)
-
-    # now translate the text and generate pdf
-    translated_text = translate(text)
-    # generate_pdf(translated_text)
-
-    # session["uploadFilePath"] = destination
-    response = "File successfully uploaded"
-    return response
-
-
-with app.app_context():
-    # MODEL = tf.keras.models.load_model('model')
-    tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-hi")
-    model = TFAutoModelForSeq2SeqLM.from_pretrained("tf_model/")
-
-
-def generate_translation(input_text):
-    with current_app.app_context():
-        tokenized = tokenizer(input_text, return_tensors="np")
-        out = model.generate(**tokenized, max_length=128)
-        # print(out)
-
-        with tokenizer.as_target_tokenizer():
-            output = tokenizer.decode(out[0], skip_special_tokens=True)
-            print(tokenizer.decode(out[0], skip_special_tokens=True))
-            return {"Translation": output}
-
-
-# for model
+# Main route for text translation
 @app.route("/predict", methods=["POST"])
 def generate():
     # print(request.data)
@@ -203,3 +175,37 @@ if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
 
 # flask_cors.CORS(app, expose_headers="Authorization")
+
+
+# * Unwanted code as of now
+# import docx
+# from dotenv import load_dotenv
+# from docx2pdf import convert
+# import tensorflow as tf
+# import numpy as np
+# from fastapi import FastAPI
+# from pydantic import BaseModel
+# load_dotenv()
+
+# import transformers
+# print(os.getenv("CLOUD_NAME"))
+
+# import flask_cors
+
+# MODEL = tf.keras.models.load_model('model')
+
+# def generate_pdf():
+#     document = docx.Document()
+#     document.add_paragraph(translate("dummy"))
+#     document.save("test.docx")
+# * In this approach docx file is generated but it is not converted to pdf. Because docx2pdf only works in Microsoft Windows
+#     convert("test.docx")
+
+
+# def generate_pdf():
+#     pdfkit.from_string(translate("hello"), "./out/out.pdf")
+#     return "PDF generated"
+
+
+# for uploading to cloudinary
+# @app.route("/test", methods=["GET"])
