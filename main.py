@@ -7,6 +7,7 @@ import pdfkit
 import cloudinary.uploader
 from transformers import AutoTokenizer, TFAutoModelForSeq2SeqLM
 from PyPDF2 import PdfReader
+from gtts import gTTS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HELLO WORLD")
@@ -168,6 +169,24 @@ def generate():
     #     print(tokenizer.decode(out[0], skip_special_tokens=True))
     #     return {"Translation": output}
     return jsonify(translation)
+
+
+@app.route("/audio", methods=["POST"])
+def tts():
+    user_input = request.get_json()
+    text = user_input.get("input")
+    lang = user_input.get("lang")
+    print(text, lang)
+
+    tts = gTTS(
+        text=text,
+        lang=lang,
+    )
+    tts.save("./audio/hello.mp3")
+
+    res = upload_to_cloudinary("./audio/hello.mp3")
+
+    return res
 
 
 if __name__ == "__main__":
