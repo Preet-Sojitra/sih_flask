@@ -107,6 +107,7 @@ def fileTranslate(file):
 def generate_pdf():
     print(request.files["file"])
     translated_text = fileTranslate(request.files["file"])
+    print(translated_text)
 
     # translated_text = translate("hello")
 
@@ -147,7 +148,18 @@ def generate_pdf():
 
     upload_result = upload_to_cloudinary("./out/out.pdf")
 
-    return upload_result
+    upload_data = {
+        "data": upload_result.get_data(
+            as_text=True
+        )  # Convert binary data to a string if needed
+    }
+
+    res = {"upload_result": upload_data, "translated_text": translated_text}
+
+    print(res)
+    type(res)
+
+    return jsonify(res)
 
 
 # Main route for text translation
