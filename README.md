@@ -2,6 +2,10 @@
 
 > This repository contains the backend code. To view the frontend code, head over to [this repository](https://github.com/Preet-Sojitra/AnuvaadRatna). All the description and instructions are given there.
 
+## Live Demo:
+
+You can view the live demo of Anuvaad Ratna [here](https://youtu.be/d3sqFWYGBTk?si=LiZHsLfnqdwJ4NRj).
+
 ## Team Members:
 
 - [Preet Sojitra](https://github.com/Preet-Sojitra)
@@ -35,7 +39,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-> NOTE: You need to have the model's weights and two other configuration files in the backend repository's `tf_model/` directory . You can download the weights file from [here](). [LINK will be added soon]
+> NOTE: You need to have the model's weights and two other configuration files in the backend repository's `tf_model/` directory . You can download the weights file from [here](https://drive.google.com/drive/folders/1qwYxV5rqJnK_Irz7EX7fwDlSliEttzd0?usp=sharing). Download whole `tf_model/` directory and place it in the backend repository's root directory.
 
 4. Now, head over to the [frontend repository](https://github.com/Preet-Sojitra/AnuvaadRatna) and clone it (if you haven't already).
 
